@@ -14,7 +14,7 @@
  * Constants for determining the output, as specified in the task.
  */
 static const int K_MIN = 3;
-static const int K_MAX = 14;
+static const int K_MAX = 29;
 
 
 /*
@@ -24,10 +24,10 @@ static const int K_MAX = 14;
 static void
 fill_invsquare_vector(int n, double *v)
 {
-	int i, k;
+	int i;
+	#pragma omp parallel for schedule(static)
 	for(i = 0; i < n; ++i) {
-		k = i + 1; 
-		v[i] = 1.0 / (k * k);
+		v[i] = 1.0 / (i * i + 2 * i + 1);
 	}
 }
 
@@ -40,6 +40,7 @@ sum_vector(int n, double *v)
 	double sum;
 	int i;
 	sum = 0.0;
+	#pragma omp parallel for schedule(static) reduction(+:sum)
 	for(i = 0; i < n; ++i) 
 		sum += v[i];	
 	return sum;
