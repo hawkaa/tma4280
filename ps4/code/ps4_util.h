@@ -1,3 +1,6 @@
+/*
+ * Utility module
+ */
 #ifndef PS4_UTIL_H_
 #define PS4_UTIL_H_
 
