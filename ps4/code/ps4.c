@@ -9,12 +9,14 @@
 #include <stdlib.h>
 #include <math.h>
 
+/* local headers */
+#include "util.h"
 
 /*
  * Constants for determining the output, as specified in the task.
  */
 static const int K_MIN = 3;
-static const int K_MAX = 29;
+static const int K_MAX = 14;
 
 
 /*
@@ -67,9 +69,18 @@ intpow(int b, int e)
 int
 main(int argc, char** argv)
 {
+	#ifdef HAVE_OPENMP
+	printf("OpenMP suppoort enabled\n");
+	#endif
 	double pi_reference, sum_reference, sum;
 	int n, k;
-	
+
+	/* timestamps */
+	double t1, t2;
+
+	/* start timer */
+	t1 = wall_time(); 
+
 	/* reference values */
 	pi_reference = 4.0 * atan(1.0);
 	sum_reference = pi_reference * pi_reference / 6.0;
@@ -84,6 +95,12 @@ main(int argc, char** argv)
 		sum = sum_vector(intpow(2,k), v);
 		printf("%i:\t %e\n", k, sum-sum_reference);
 	}
+
+	/* stop timer */
+	t2 = wall_time();
+
+	/* printing timing information */
+	printf("Time: %e\n", t2-t1);
 
 	/* preferred over return statements to end application */
 	exit(0);
