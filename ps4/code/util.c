@@ -8,6 +8,14 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+
+#ifdef HAVE_MPI
+#include <mpi.h>
+#endif
+
 /* local headers */
 #include "util.h"
 
@@ -20,10 +28,12 @@ wall_time()
 {
 	#ifdef HAVE_MPI
   	return MPI_Wtime();
+	#elif defined(HAVE_OPENMP)
+  	return omp_get_wtime();
 	#else
-  	struct timeval tmpTime;
-  	gettimeofday(&tmpTime,NULL);
-  	return tmpTime.tv_sec + tmpTime.tv_usec/1.0e6;
+	struct timeval tmpTime;
+	gettimeofday(&tmpTime,NULL);
+	return tmpTime.tv_sec + tmpTime.tv_usec/1.0e6;
 	#endif
 }
 
