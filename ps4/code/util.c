@@ -37,3 +37,18 @@ wall_time()
 	#endif
 }
 
+/*
+ * Power function for integers.
+ * Created because the pow in stdlib did not accept integer constants.
+ */
+int
+intpow(const int b, int e)
+{
+	int i, r;
+	r = 1;
+	for(i = 0; i < e; ++i)
+		r = r*b;
+	return r;
+}
+
+

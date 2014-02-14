@@ -9,4 +9,7 @@
 extern double
 wall_time();
 
+extern int
+intpow();
+
 #endif

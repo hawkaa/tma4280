@@ -69,20 +69,6 @@ sum_vector(int n, const double *v)
 }
 
 /*
- * Power function for integers.
- * Created because the pow in stdlib did not accept integer constants.
- */
-static int
-intpow(const int b, int e)
-{
-	int i, r;
-	r = 1;
-	for(i = 0; i < e; ++i)
-		r = r*b;
-	return r;
-}
-
-/*
  * Initialize the program by setting MPI variables and starting timers.
  */
 static void
