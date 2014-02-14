@@ -22,36 +22,31 @@
 static const int K_MIN = 3;
 static const int K_MAX = 14;
 
+/*
+ * Timestamps
+ */
+static double t1, t2;
+
+/*
+ * MPI variables
+ */ 
+static int rank, size;
+static MPI_Status status;
+static int tag = 100;
 
 /*
  * Fills a vector of length n with the inverse squared of the index (as 
  * specified in the task).
  */
 static void
-fill_invsquare_vector(int n, double *v)
+fill_partial_vector(const int n, double *vector, const int num_parts, const int offset)
 {
-	int i;
+	int i, j;
 	#pragma omp parallel for schedule(static)
 	for(i = 0; i < n; ++i) {
-		v[i] = 1.0 / (i * i + 2 * i + 1);
+		j = i*num_parts + offset;
+		vector[i] = 1.0 / (j * j + 2 * j + 1);
 	}
-}
-
-static void
-distribute_vector(int n, double *v, int world_size)
-{
-	int rank, k, i;
-	double *buf;
-
-	k = n / world_size;
-	buf = malloc(sizeof (double) * k);
-	for(rank = 1; rank < world_size; ++rank) {
-		for(i = 0; i < k; ++i) {
-			buf[i] = v[i*world_size + rank];
-		}
-		//MPI_Send(buf, k, MPI_DOUBLE, rank, 100, MPI_COMM_WORLD);
-	}
-
 }
 
 /*
@@ -75,30 +70,16 @@ sum_vector(int n, const double *v)
 static int
 intpow(const int b, int e)
 {
-	int r;
-	r = b;
-	while(e > 1){
-		r = r * b;
-		--e;
-	}
+	int i, r;
+	r = 1;
+	for(i = 0; i < e; ++i)
+		r = r*b;
 	return r;
 }
 
-/*
- * Program entry function.
- */
-int
-main(int argc, char** argv)
+static void
+initialize(int argc, char** argv)
 {
-		
-	double pi_reference, sum_reference, sum;
-	int rank, size;
-	int n, k;
-	double *v;
-	/* timestamps */
-	double t1, t2;
-	
-	/* mpi initialization */
 	#ifdef HAVE_MPI
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -107,9 +88,9 @@ main(int argc, char** argv)
 	rank = 0;
 	size = 1;
 	#endif
-
+	
 	if (rank == 0) {
-		
+		/* this could be relevant debug info */	
 		#ifdef HAVE_OPENMP
 		printf("OpenMP support enabled.\n");
 		#endif
@@ -122,26 +103,11 @@ main(int argc, char** argv)
 	/* start timer */
 	t1 = wall_time();
 
-	MPI_Status status;
+}
 
-	if(rank == 0) {
-		n = intpow(2, K_MAX);
-		v = malloc(sizeof (double) * n);
-		fill_invsquare_vector(n,v);
-		distribute_vector(n,v,size-1);
-	} else {
-		MPI_Recv(v, 13, MPI_DOUBLE, 0, 100, MPI_COMM_WORLD, status);
-	}
-
-
-
-	/*double d = 2.0;
-	double res = 0.1;
-	
-	MPI_Reduce(&d, &res, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	if(rank == 0)
-		printf("%f\n", res);
-	*/
+static void
+finalize()
+{
 	
 	/* stop timer */
 	t2 = wall_time();
@@ -154,35 +120,68 @@ main(int argc, char** argv)
 	#endif
 
 	exit(0);
-	
+}
 
-	/* start timer *
-	t1 = wall_time(); 
+/*
+ * Program entry function.
+ */
+int
+main(int argc, char** argv)
+{
+	/* variables for references and sum */
+	double pi_reference, sum_reference, partial_sum, sum;
 
-	/* reference values *
+	/* vector to sum */
+	double *v;
+		
+	/* various */
+	int n, k, i, num_elements, partial_num_elements;
+
+	initialize(argc, argv);
+
+	/* reference values */
 	pi_reference = 4.0l * atan(1.0);
 	sum_reference = pi_reference * pi_reference / 6.0;
 	
-	/* allocating and filling vector with values 
-	n = intpow(2, K_MAX);
-	double *v = malloc(sizeof (double) * n);
-	fill_invsquare_vector(n, v);
-	
+	/* allocate room for vector */
+	n = intpow(2, K_MAX) / size;
+	v  = malloc(sizeof (double) * n);
 
-	/* summing and printing results *
 	/*
+	 * Giving everyone a partial vector
+	 */ 
+	if(rank == 0) {
+		int i;
+		for(i = 1; i < size; ++i){
+			fill_partial_vector(n, v, size, i);
+			MPI_Send(v, n, MPI_DOUBLE, i, tag, MPI_COMM_WORLD); 
+		}
+		fill_partial_vector(n, v, size, rank);
+	} else {
+		MPI_Recv(v, n, MPI_DOUBLE, 0, tag, MPI_COMM_WORLD, &status);	
+	}
+
+	/* now everyone has their partial vector stored in v */
+
+	/* iterating over k's */
 	for(k = K_MIN; k <= K_MAX; ++k) {
-		sum = sum_vector(intpow(2,k), v);
-		printf("%i:\t %e\n", k, sum-sum_reference);
-	}*/
+		
+		/* how many elements are needed */
+		num_elements = intpow(2, k);
+		partial_num_elements = num_elements / size;
+		
+		/* summing vector */
+		partial_sum = sum_vector(partial_num_elements, v);
 
-	/* stop timer *
-	t2 = wall_time();
-
-	/* printing timing information *
-	printf("Time: %e\n", t2-t1);
-
-	/* preferred over return statements to end application *
-	MPI_Finalize();
-	exit(0);*/
+		/* reducing into p0 */
+		MPI_Reduce (&partial_sum, &sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		
+		if(rank == 0) {
+			/* reporting if p0 */
+			printf("%i:\t %e\n", k, sum-sum_reference);
+		}
+	}
+	
+	/* finalizing */
+	finalize();
 }
