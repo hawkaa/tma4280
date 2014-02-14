@@ -21,7 +21,7 @@
 
 /*
  * Returns current wall time.
- * Function copied and modified from Arne Morten Kvarving's common library.
+ * Function copied a from Arne Morten Kvarving's common library.
  */
 double
 wall_time()
