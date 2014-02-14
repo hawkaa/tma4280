@@ -1,2 +1,6 @@
 # VIM FILES
 *.swp
+
+#latex
+*.aux
+*.log
