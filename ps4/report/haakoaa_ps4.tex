@@ -94,23 +94,23 @@ To use the MPI library, size and rank variables were introduced, in order to man
 OpenMP and MPI can both individually be turned on and off. If MPI support is turned off, the preprocessor conveniently makes sure that no MPI dependencies are sent to the compiler, making the program compile and run on machines with no MPI. The program have been tested and verified to work with both OpenMP and MPI enabled simultaneously.
 \begin{figure}[h]
 	\centering
-\begin{tabular}{c | c c c}
+\begin{tabular}{c | c c c c}
 	\hline
-	k & P = 2 & P = 8 & P = 16 \\
+	k & Single Processor & P = 2 & P = 8 & P = 16 \\
 	\hline
 	\hline
-	3 	& -1.175120e-01 & -1.175120e-01 & -1.644934e+00 \\
-	4 	& -6.058753e-02 & -6.058753e-02 & -6.058753e-02 \\
-	5 	& -3.076680e-02 & -3.076680e-02 & -3.076680e-02 \\
-	6	& -1.550357e-02 & -1.550357e-02 & -1.550357e-02 \\
-	7	& -7.782062e-03 & -7.782062e-03 & -7.782062e-03 \\
-	8	& -3.898631e-03 & -3.898631e-03 & -3.898631e-03 \\
-	9	& -1.951219e-03 & -1.951219e-03 & -1.951219e-03 \\
-	10	& -9.760858e-04 & -9.760858e-04 & -9.760858e-04 \\
-	11	& -4.881621e-04 & -4.881621e-04 & -4.881621e-04 \\
-	12	& -2.441108e-04 & -2.441108e-04 & -2.441108e-04 \\
-	13	& -1.220629e-04 & -1.220629e-04 & -1.220629e-04 \\
-	14	& -6.103329e-05 & -6.103329e-05 & -6.103329e-05 \\
+	3 	& 1.175120e-01 & 1.175120e-01 & 1.175120e-01 & 1.644934e+00 \\
+	4 	& 6.058753e-02 & 6.058753e-02 & 6.058753e-02 & 6.058753e-02 \\
+	5 	& 3.076680e-02 & 3.076680e-02 & 3.076680e-02 & 3.076680e-02 \\
+	6	& 1.550357e-02 & 1.550357e-02 & 1.550357e-02 & 1.550357e-02 \\
+	7	& 7.782062e-03 & 7.782062e-03 & 7.782062e-03 & 7.782062e-03 \\
+	8	& 3.898631e-03 & 3.898631e-03 & 3.898631e-03 & 3.898631e-03 \\
+	9	& 1.951219e-03 & 1.951219e-03 & 1.951219e-03 & 1.951219e-03 \\
+	10	& 9.760858e-04 & 9.760858e-04 & 9.760858e-04 & 9.760858e-04 \\
+	11	& 4.881621e-04 & 4.881621e-04 & 4.881621e-04 & 4.881621e-04 \\
+	12	& 2.441108e-04 & 2.441108e-04 & 2.441108e-04 & 2.441108e-04 \\
+	13	& 1.220629e-04 & 1.220629e-04 & 1.220629e-04 & 1.220629e-04 \\
+	14	& 6.103329e-05 & 6.103329e-05 & 6.103329e-05 & 6.103329e-05 \\
 	\hline
 	
 \end{tabular}
@@ -119,15 +119,21 @@ OpenMP and MPI can both individually be turned on and off. If MPI support is tur
 \end{figure}
 
 \paragraph{Running with different numbers of processors}
-As seen in figure \ref{fig:results}, the results of running with $P=2$ is the same as running with $P=8$, as it should be. This is not the case for $P=16$, when $k=3$, the resulting sum equals $0.0$. Acutally, the program will not run correctly for passes where $2^k \le P$ because of integer division. If $P=16$ and $2^k=8$, each node will theoretically need to calculate $0.5$ of the elements. This is rounded down, so that each node will report the sum of $0.0$. I have done no effort in trying to correct this issue, because if the series is smaller than the number of nodes, the value of $P$ is probably a real overkill (and could easily be set to a lower value).
+As seen in figure \ref{fig:results}, the results of running with $P=1$, $P=2$ and $P=8$ are all the same, as it should be. This is not the case for $P=16$, when $k=3$, the resulting sum equals $0.0$. Acutally, the program will not run correctly for passes where $2^k \le P$ because of integer division. If $P=16$ and $2^k=8$, each node will theoretically need to calculate $0.5$ of the elements. This is rounded down, so that each node will report the sum of $0.0$. I have done no effort in trying to correct this issue, because if the series is smaller than the number of nodes, the value of $P$ is probably a real overkill (and could easily be set to a lower value).
 
 \paragraph{Memory requirement}
+Neglecting other variables ($n >> 1$), we can in the source code see that each processor will allocate space for no more than $n \over P$ floating point values with double precision. $P_0$ will use its own partial vector buffer when using \emph{MPI\_Send}, and when done, use the same buffer for it's own values. With a total of $P$ processors, we get the following memory equation:
+\begin{equation}
+	M = O(P \times {n \over P} ) = O(n)
+\end{equation}
 
 \paragraph{Floating point operations to fill up a vector}
 In the loop filling up the partial vector, a total of 2 additions, 2 multiplications, 1 division and 1 increment are performed. This loop is run the same amount of times as $2^{K_{max}}$:
 \begin{equation}
 	F_{fill} = 6 \times 2^{K_{max}}
 \end{equation}
+With $K_{max}=14$ this equals $98'304$ floating point operations.
+
 
 \paragraph{Floating point operations to calculate the sum}
 Each node will individually perform $F_{node}$ additions:
@@ -139,7 +145,14 @@ The MPI allreduce will add together a total of $P-1$ partial sums. From this, we
 	F_{sum} = P({2^{K_{max}} \over P} - 1) + P -1 = (2^{K_{max}} - P) + P -1 = 2^{K_{max}} - 1
 \end{equation}
 
-\begin{figure}[h]
+With $K_{max}=14$ this equals $16'383$ floating point operations.
+
+
+
+\paragraph{Load balancing}
+The multi-processor program is not balanced, because $P_0$ is the only processor generating any elements. As we can see from above calculations, generating the vector requires much more floating point operations than summing the elements together. This task should also be split to different processors in order to load balance the program.
+
+\begin{figure}[t]
 \centering
 \begin{tabular}{c | c c c c}
 	\hline
@@ -149,22 +162,14 @@ The MPI allreduce will add together a total of $P-1$ partial sums. From this, we
 	14	& 2.369881e-04 & 4.323812e-03 & 8.273387e-02 & 2.003469e-01 \\
 	29 	& 2.775124e+00	& 1.254882e+00	& 1.706845e+00 & 1.821380e+00 \\
 \end{tabular}
-	\caption{Running times with various parallelization techniques on an Intel i7}
+	\caption{Running times with various parallelization techniques on an Intel Core i7-3612QM 2.1GHz}
 	\label{fig:time}
 \end{figure}
 \paragraph{Parallel processing or not?} I think parallell processing is very attractive for calculating sums in general, but the problem size in this exercise is to small, making the overhead too big. I have performed a very informal and non-scientific performance test on the run times, as shown in figure \ref{fig:time}. We can see that for $K_{max}=1$, the non parallel program runs one order of magnitude faster than the OpenMP version. Increasing $K_{max}$ to 29, will make the OpenMP run twice as fast as the serial one.
 
-\newpage
-\begin{thebibliography}{9}
-	
-	\bibitem{compilers}
-	Aho, A. V., Lam, M. S., Ravi, S. and Ullman, J. D.
-	(2006)
-	\emph{Compilers: Principles, Techniques, and Tools}.
-	Second Edition. 
-	Pearson Education, Inc.
 
-\end{thebibliography}
+\paragraph{Conventions}
+As I have never touched the C programming language before, I have tried to read myself up on some standards and style for coding in this language. I have followed a document\footnote{http://www.jetcafe.org/jim/c-style.html} written by Jim Larson in 1996, as it seemed well rationalized. 
 
 \end{document}
 

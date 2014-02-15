@@ -192,9 +192,12 @@ main(int argc, char** argv)
 
 		if(rank == 0) {
 			/* reporting if p0 */
-			printf("%i:\t %e\n", k, sum-sum_reference);
+			printf("%i:\t %e\n", k, sum_reference - sum);
 		}
 	}
+
+	/* freeing up the vector */
+	free(v);
 	
 	/* finalizing */
 	finalize();
